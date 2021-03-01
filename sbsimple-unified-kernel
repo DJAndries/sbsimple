@@ -1,0 +1,58 @@
+#!/bin/sh
+
+UKERNELS=('linux' 'linux-fallback')
+
+kernels_build() {
+	report_stage "Building unified kernels"
+
+	UCODE_IMG=$(ls /boot | grep ucode.img | head -n 1)
+	
+	for i in "${UKERNELS[@]}"; do
+		INITRAMFS="/boot/initramfs-$i.img"
+		if [ -n "$UCODE_IMG" ]; then
+			report_start "Creating new $i with ucode: $UCODE_IMG"
+			ce "cat /boot/$UCODE_IMG /boot/initramfs-$i.img > /tmp/initramfs-linux.img"
+			INITRAMFS="/tmp/initramfs-linux.img"	
+		fi
+		report_start "Creating $i unified kernel image"
+
+		(mkdir -p /boot/EFI/Linux || true) 2>/dev/null
+		chmod -R 755 /boot/EFI
+		ce "objcopy \
+--add-section .osrel=\"/usr/lib/os-release\" --change-section-vma .osrel=0x20000 \
+--add-section .linux=\"/boot/vmlinuz-linux\" --change-section-vma .linux=0x2000000 \
+--add-section .initrd=\"$INITRAMFS\" --change-section-vma .initrd=0x3000000 \
+\"/usr/lib/systemd/boot/efi/linuxx64.efi.stub\" \"/boot/EFI/Linux/$i.efi\""
+		[ -n "$UCODE_IMG" ] && rm $INITRAMFS
+		report_success
+	done
+}
+
+kernels_sign() {
+	report_stage "Signing unified kernels"
+
+	for i in "${UKERNELS[@]}"; do
+		cd /etc/efi-keys
+		report_start "Signing $i unified kernel"
+		ce "sbsign --key db.key --cert db.crt --output /boot/EFI/Linux/$i.efi /boot/EFI/Linux/$i.efi"
+		report_success
+	done
+}
+
+KEYS_USAGE_MSG="$BANNER
+
+USAGE: $0 unified-kernel <subcommand>
+
+SUBCOMMANDS:
+	build - Build unified kernels including initramfs and ucode
+	sign - Sign the unified kernels
+	setup - Perform all of the above 
+"
+
+handle_unified_kernel() {
+	case "$1" in
+		build) kernels_build;;
+		sign) kernels_sign;;
+		*) >&2 echo "$KEYS_USAGE_MSG"
+	esac	
+}
