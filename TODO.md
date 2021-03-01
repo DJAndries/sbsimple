@@ -1,0 +1,2 @@
+- support systemd-boot
+- add verbose logging mode

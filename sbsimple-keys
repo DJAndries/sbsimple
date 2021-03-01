@@ -77,7 +77,7 @@ keys_enroll() {
 
 KEYS_USAGE_MSG="$BANNER
 
-USAGE: $0 keys <subcommand>
+USAGE: $0 keys <subcommand> [-v]
 
 SUBCOMMANDS:
 	generate - Generate keys and certificates for secure boot

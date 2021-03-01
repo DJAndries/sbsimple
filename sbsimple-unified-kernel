@@ -39,9 +39,9 @@ kernels_sign() {
 	done
 }
 
-KEYS_USAGE_MSG="$BANNER
+KERN_USAGE_MSG="$BANNER
 
-USAGE: $0 unified-kernel <subcommand>
+USAGE: $0 unified-kernel <subcommand> [-v]
 
 SUBCOMMANDS:
 	build - Build unified kernels including initramfs and ucode
@@ -53,6 +53,7 @@ handle_unified_kernel() {
 	case "$1" in
 		build) kernels_build;;
 		sign) kernels_sign;;
-		*) >&2 echo "$KEYS_USAGE_MSG"
+		setup) kernels_build && kernels_sign;;
+		*) >&2 echo "$KERN_USAGE_MSG"
 	esac	
 }

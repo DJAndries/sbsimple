@@ -1,0 +1,97 @@
+#!/bin/sh
+
+LSBLK_OUT=$(lsblk -rio UUID,PATH,MOUNTPOINT)
+DRIVE_UUID=$(cat $LSBLK_OUT | grep /boot | cut -d' ' -f1)
+DRIVE_PATH=$(cat $LSBLK_OUT | grep /boot | cut -d' ' -f2)
+SECBOOT_ENTRY_CONTENTS="#!/bin/sh
+exec tail -n +3 \\\$0
+
+menuentry 'Linux (Secure Boot)' --user {
+	insmod fat
+	insmod chain
+	search --no-floppy --fs-uuid --set=root $DRIVE_UUID
+	chainloader /EFI/Linux/linux.efi
+}
+
+menuentry 'Linux Fallback (Secure Boot)' --user {
+	insmod fat
+	insmod chain
+	search --no-floppy --fs-uuid --set=root $DRIVE_UUID
+	chainloader /EFI/Linux/linux-fallback.efi
+}
+"
+
+grub_gen_pwd_config() {
+	echo "#!/bin/sh
+exec tail -n +3 \\\$0
+
+set superusers=\\\"root\\\"
+password_pbkdf2 root $1"
+}
+
+grub_prompt_new_password() {
+	echo -n "Enter secure password to protect GRUB: "
+	read -s GRUBPASS
+	echo -ne "\nConfirm password: "
+	read -s CGRUBPASS
+	echo
+	[ -n "$GRUBPASS" ] && [ "$GRUBPASS" = "$CGRUBPASS" ] || grub_prompt_new_password
+}
+
+grub_entry() {
+	report_stage "Adding Linux secure boot entries in GRUB"
+	report_start "Adding Linux secure boot entries to /etc/grub.d"
+	ce "echo \"$SECBOOT_ENTRY_CONTENTS\" > /etc/grub.d/09_secboot"
+	chmod 755 /etc/grub.d/09_secboot
+	report_start "Making GRUB config"
+	ce "grub-mkconfig -o /boot/grub/grub.cfg"
+	report_success
+}
+
+grub_password() {
+	grub_prompt_new_password
+	report_stage "Adding password protection to GRUB"
+	report_start "Hashing password"
+	PASSHASH_INPUT=$(echo -e "$GRUBPASS\n$GRUBPASS\n")
+	ce "grub-mkpasswd-pbkdf2 <<< \"$PASSHASH_INPUT\""
+	PASSHASH=$(echo "$CMDOUT" | grep PBKDF2 | cut -d' ' -f7)
+	report_start "Adding password protection config to /etc/grub.d"
+	ce "echo \"$(grub_gen_pwd_config "$PASSHASH")\" > /etc/grub.d/50_pwd"
+	chmod 755 /etc/grub.d/50_pwd
+	report_start "Making GRUB config"
+	ce "grub-mkconfig -o /boot/grub/grub.cfg"
+	report_success
+}
+
+grub_install() {
+	report_stage "Making standalone GRUB image"
+	report_start "Making image"
+	mkdir -p /boot/EFI/GRUB 2>/dev/null
+	chmod 755 /boot/EFI/GRUB
+	ce "grub-mkstandalone -d /usr/lib/grub/x86_64-efi/ -O x86_64-efi \
+--modules=\"part_gpt part_msdos\" -o /boot/EFI/GRUB/grubx64.efi \
+/boot/grub/grub.cfg=/boot/grub/grub.cfg"
+	# Some commands to use: efibootmgr --create --disk /dev/sda --part 1 --loader /EFI/GRUB/grubx64.efi -o 0000 --label "GRUBB" --verbose
+	report_success
+}
+
+GRUB_USAGE_MSG="$BANNER
+
+USAGE: $0 grub <subcommand> [-v]
+
+SUBCOMMANDS:
+	unified-entry - Add unified kernel boot entry if not existing
+	password-protect - Add password protection to GRUB if not existing
+	install - Make & install standalone GRUB
+	sign - Sign standalone GRUB with secure boot keys
+	setup - Perform all of the above 
+"
+
+handle_grub() {
+	case "$1" in
+		unified-entry) grub_entry;;
+		password-protect) grub_password;;
+		install) grub_install;;
+		*) >&2 echo "$GRUB_USAGE_MSG"
+	esac	
+}
