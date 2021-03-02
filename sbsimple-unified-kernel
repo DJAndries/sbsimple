@@ -31,12 +31,16 @@ kernels_build() {
 kernels_sign() {
 	report_stage "Signing unified kernels"
 
+	prompt_existing_passphrase
+	report_start "Temporarily decrypting db key"
+	cd /etc/efi-keys
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< $PASS"
 	for i in "${UKERNELS[@]}"; do
-		cd /etc/efi-keys
 		report_start "Signing $i unified kernel"
-		ce "sbsign --key db.key --cert db.crt --output /boot/EFI/Linux/$i.efi /boot/EFI/Linux/$i.efi"
+		ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/Linux/$i.efi /boot/EFI/Linux/$i.efi"
 		report_success
 	done
+	clean_tmp_keys
 }
 
 KERN_USAGE_MSG="$BANNER

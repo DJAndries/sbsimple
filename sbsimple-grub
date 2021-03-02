@@ -1,23 +1,27 @@
 #!/bin/sh
 
-LSBLK_OUT=$(lsblk -rio UUID,PATH,MOUNTPOINT)
-DRIVE_UUID=$(cat $LSBLK_OUT | grep /boot | cut -d' ' -f1)
-DRIVE_PATH=$(cat $LSBLK_OUT | grep /boot | cut -d' ' -f2)
+LSBLK_OUT=$(lsblk -rio UUID,MOUNTPOINT,PATH)
+DRIVE_UUID=$(echo "$LSBLK_OUT" | grep /boot | cut -d' ' -f1)
+DRIVE_PATH=$(echo "$LSBLK_OUT" | grep /boot | cut -d' ' -f3)
+ROOT_UUID=$(echo "$LSBLK_OUT" | grep " / " | cut -d' ' -f1)
+
+source /etc/default/grub
+
 SECBOOT_ENTRY_CONTENTS="#!/bin/sh
 exec tail -n +3 \\\$0
 
-menuentry 'Linux (Secure Boot)' --user {
+menuentry 'Linux (Secure Boot)' --unrestricted {
 	insmod fat
 	insmod chain
-	search --no-floppy --fs-uuid --set=root $DRIVE_UUID
-	chainloader /EFI/Linux/linux.efi
+	search --no-floppy --fs-uuid --set=root $DRIVE_UUID 
+	chainloader /EFI/Linux/linux.efi root=UUID=$ROOT_UUID rw $GRUB_CMDLINE_LINUX_DEFAULT
 }
 
-menuentry 'Linux Fallback (Secure Boot)' --user {
+menuentry 'Linux Fallback (Secure Boot)' --unrestricted {
 	insmod fat
 	insmod chain
 	search --no-floppy --fs-uuid --set=root $DRIVE_UUID
-	chainloader /EFI/Linux/linux-fallback.efi
+	chainloader /EFI/Linux/linux-fallback.efi root=UUID=$ROOT_UUID rw $GRUB_CMDLINE_LINUX_DEFAULT
 }
 "
 
@@ -71,8 +75,26 @@ grub_install() {
 	ce "grub-mkstandalone -d /usr/lib/grub/x86_64-efi/ -O x86_64-efi \
 --modules=\"part_gpt part_msdos\" -o /boot/EFI/GRUB/grubx64.efi \
 /boot/grub/grub.cfg=/boot/grub/grub.cfg"
-	# Some commands to use: efibootmgr --create --disk /dev/sda --part 1 --loader /EFI/GRUB/grubx64.efi -o 0000 --label "GRUBB" --verbose
+	report_start "Adding boot entry in GRUB"
+	ce "efibootmgr | grep GRUB | head -n 1 | cut -d'*' -f1"
+	[ -n "$CMDOUT" ] && ce "efibootmgr -B -b ${CMDOUT:4:100}"
+	ce "efibootmgr --create --disk /dev/sda --part 1 --loader /EFI/GRUB/grubx64.efi \
+-o 0000 --label \"GRUB\" --verbose"
 	report_success
+}
+
+grub_sign() {
+	report_stage "Signing standalone GRUB image"
+
+	prompt_existing_passphrase
+	cd /etc/efi-keys
+	report_start "Temporarily decrypting db key"
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< $PASS"
+	report_start "Signing image"
+	ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/GRUB/grubx64.efi \
+/boot/EFI/GRUB/grubx64.efi"
+	report_success
+	clean_tmp_keys
 }
 
 GRUB_USAGE_MSG="$BANNER
@@ -92,6 +114,8 @@ handle_grub() {
 		unified-entry) grub_entry;;
 		password-protect) grub_password;;
 		install) grub_install;;
+		sign) grub_sign;;
+		setup) grub_entry && grub_password && grub_install && grub_sign;;
 		*) >&2 echo "$GRUB_USAGE_MSG"
 	esac	
 }

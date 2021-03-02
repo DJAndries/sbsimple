@@ -24,5 +24,6 @@ case "$1" in
 	keys) handle_keys "$2";;
 	unified-kernel) handle_unified_kernel "$2";;
 	grub) handle_grub "$2";;
+	setup) handle_keys setup && handle_unified_kernel setup && handle_grub setup;;
 	*) >&2 echo "$USAGE_MSG"
 esac
