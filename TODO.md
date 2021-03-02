@@ -1,6 +1,4 @@
 - support systemd-boot
-- remove function
-- grub config tamper check
 
 - pkgbuild
   - deps

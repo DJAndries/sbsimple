@@ -34,13 +34,21 @@ kernels_sign() {
 	prompt_existing_passphrase
 	report_start "Temporarily decrypting db key"
 	cd /etc/efi-keys
-	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< $PASS"
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< \"$PASS\""
 	for i in "${UKERNELS[@]}"; do
 		report_start "Signing $i unified kernel"
 		ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/Linux/$i.efi /boot/EFI/Linux/$i.efi"
 		report_success
 	done
 	clean_tmp_keys
+}
+
+kernels_remove() {
+	report_start "Removing unified kernels"
+	for i in "${UKERNELS[@]}"; do
+		rm /boot/EFI/Linux/$i.efi 2>/dev/null
+	done
+	report_success
 }
 
 KERN_USAGE_MSG="$BANNER
@@ -51,6 +59,7 @@ SUBCOMMANDS:
 	build - Build unified kernels including initramfs and ucode
 	sign - Sign the unified kernels
 	setup - Perform all of the above 
+	remove - Remove unified kernels
 "
 
 handle_unified_kernel() {
@@ -58,6 +67,7 @@ handle_unified_kernel() {
 		build) kernels_build;;
 		sign) kernels_sign;;
 		setup) kernels_build && kernels_sign;;
+		remove) kernels_remove;;
 		*) >&2 echo "$KERN_USAGE_MSG"
 	esac	
 }

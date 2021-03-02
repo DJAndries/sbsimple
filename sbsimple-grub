@@ -67,6 +67,11 @@ grub_password() {
 	report_success
 }
 
+efi_remove_grub_entry() {
+	ce "efibootmgr | grep GRUB | head -n 1 | cut -d'*' -f1"
+	[ -n "$CMDOUT" ] && ce "efibootmgr -B -b ${CMDOUT:4:100}"
+}
+
 grub_install() {
 	report_stage "Making standalone GRUB image"
 	report_start "Making image"
@@ -76,8 +81,7 @@ grub_install() {
 --modules=\"part_gpt part_msdos\" -o /boot/EFI/GRUB/grubx64.efi \
 /boot/grub/grub.cfg=/boot/grub/grub.cfg"
 	report_start "Adding boot entry in GRUB"
-	ce "efibootmgr | grep GRUB | head -n 1 | cut -d'*' -f1"
-	[ -n "$CMDOUT" ] && ce "efibootmgr -B -b ${CMDOUT:4:100}"
+	efi_remove_grub_entry
 	ce "efibootmgr --create --disk /dev/sda --part 1 --loader /EFI/GRUB/grubx64.efi \
 -o 0000 --label \"GRUB\" --verbose"
 	report_success
@@ -89,12 +93,23 @@ grub_sign() {
 	prompt_existing_passphrase
 	cd /etc/efi-keys
 	report_start "Temporarily decrypting db key"
-	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< $PASS"
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< \"$PASS\""
 	report_start "Signing image"
 	ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/GRUB/grubx64.efi \
 /boot/EFI/GRUB/grubx64.efi"
 	report_success
 	clean_tmp_keys
+}
+
+grub_remove() {
+	report_start "Restoring GRUB configuration"
+	rm /etc/grub.d/50_pwd 2>/dev/null
+	rm /etc/grub.d/09_secboot 2>/dev/null
+	ce "grub-mkconfig -o /boot/grub/grub.cfg"
+	report_start "Removing standalone GRUB"
+	rm /boot/EFI/GRUB/grubx64.efi 2>/dev/null
+	efi_remove_grub_entry
+	report_success
 }
 
 GRUB_USAGE_MSG="$BANNER
@@ -107,6 +122,7 @@ SUBCOMMANDS:
 	install - Make & install standalone GRUB
 	sign - Sign standalone GRUB with secure boot keys
 	setup - Perform all of the above 
+	remove - Remove configuration modifications, standalone GRUB image and EFI boot entry
 "
 
 handle_grub() {
@@ -116,6 +132,7 @@ handle_grub() {
 		install) grub_install;;
 		sign) grub_sign;;
 		setup) grub_entry && grub_password && grub_install && grub_sign;;
+		remove) grub_remove;;
 		*) >&2 echo "$GRUB_USAGE_MSG"
 	esac	
 }

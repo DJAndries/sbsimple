@@ -16,6 +16,7 @@ SUBCOMMANDS:
 	pacman - Arch/Pacman install hook operations
 	setup - Create secure boot setup for standard Arch distribution
 	unified-kernel - Unified kernel operations
+	remove - Remove secure boot setup
 "
 
 [ "$3" = "-v" ] && VERBOSE="1"
@@ -28,5 +29,9 @@ case "$1" in
 	pacman) handle_pacman "$2";;
 	setup) handle_keys setup && handle_unified_kernel setup && \
 		handle_grub setup && handle_pacman setup;;
+	remove) pacman_remove && kernels_remove && keys_remove && \
+		grub_remove && \
+		echo "Since GRUB was removed, you must run grub-install to reinstall GRUB";;
 	*) >&2 echo "$USAGE_MSG"
 esac
+

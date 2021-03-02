@@ -27,7 +27,7 @@ keys_generate() {
 	for i in "${KEY_NAMES[@]}"; do
 		report_start "Generating secure boot $i key"
 		ce "openssl req -new -x509 -newkey rsa:4096 -subj \"/CN=sbsimple $i/\" -keyout $i.key \
--out $i.crt -days 3650 -sha256 -passout stdin <<< $PASS"
+-out $i.crt -days 3650 -sha256 -passout stdin <<< \"$PASS\""
 		report_start "Creating DER certificate for $i key"
 		ce "openssl x509 -in $i.crt -out $i.cer -outform DER"
 		report_success
@@ -46,7 +46,7 @@ keys_efilists() {
 		report_start "Creating EFI sig list for $i certificate"
 		ce "cert-to-efi-sig-list -g $GUID $i.crt $i.esl"
 		report_start "Temporarily decrypting $i key"
-		ce "openssl rsa -in $i.key -passin stdin -out /tmp/$i.key <<< $PASS"
+		ce "openssl rsa -in $i.key -passin stdin -out /tmp/$i.key <<< \"$PASS\""
 		report_start "Signing EFI sig list for $i certificate"
 		ce "sign-efi-sig-list -t \"$(date --date='1 second' +'%Y-%m-%d %H:%M:%S')\" \
 -k /tmp/$SIGNING_PAIR.key -c $SIGNING_PAIR.crt $i $i.esl $i.auth"
@@ -75,6 +75,13 @@ keys_enroll() {
 	report_success
 }
 
+keys_remove() {
+	report_start "Removing EFI keys"
+	rm -rf /etc/efi-keys 2>/dev/null
+	rm -rf /etc/secureboot 2>/dev/null
+	report_success
+}
+
 KEYS_USAGE_MSG="$BANNER
 
 USAGE: $0 keys <subcommand> [-v]
@@ -84,6 +91,7 @@ SUBCOMMANDS:
 	efi-lists - Generate & sign EFI signature lists to prepare for installation
 	enroll - Enroll keys in UEFI system keystore; setup mode needs to be enabled
 	setup - Perform all of the above 
+	remove - Remove all EFI keys
 "
 
 handle_keys() {
@@ -92,6 +100,7 @@ handle_keys() {
 		efi-lists) keys_efilists;;
 		enroll) keys_enroll;;
 		setup) keys_generate && keys_efilists && keys_enroll;;
+		remove) keys_remove;;
 		*) >&2 echo "$KEYS_USAGE_MSG"
 	esac	
 }
