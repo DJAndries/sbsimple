@@ -1,10 +1,21 @@
 #!/bin/sh
 
-source $(dirname $0)/sbsimple-common
-source $(dirname $0)/sbsimple-keys
-source $(dirname $0)/sbsimple-unified-kernel
-source $(dirname $0)/sbsimple-grub
-source $(dirname $0)/sbsimple-pacman
+PROC_DIR="$(dirname $0)"
+INC_DIR="/usr/share/sbsimple"
+
+source_helper() {
+	if [ -f "$PROC_DIR/sbsimple-$1" ]; then
+		source "$PROC_DIR/sbsimple-$1"
+	else
+		source "$INC_DIR/sbsimple-$1"
+	fi
+}
+
+source_helper "common"
+source_helper "keys"
+source_helper "unified-kernel"
+source_helper "grub"
+source_helper "pacman"
 
 USAGE_MSG="$BANNER
 

@@ -1,4 +1,5 @@
 - support systemd-boot
+- define/use more constants
 
 - pkgbuild
   - deps
