@@ -4,6 +4,7 @@ source $(dirname $0)/sbsimple-common
 source $(dirname $0)/sbsimple-keys
 source $(dirname $0)/sbsimple-unified-kernel
 source $(dirname $0)/sbsimple-grub
+source $(dirname $0)/sbsimple-pacman
 
 USAGE_MSG="$BANNER
 
@@ -24,6 +25,8 @@ case "$1" in
 	keys) handle_keys "$2";;
 	unified-kernel) handle_unified_kernel "$2";;
 	grub) handle_grub "$2";;
-	setup) handle_keys setup && handle_unified_kernel setup && handle_grub setup;;
+	pacman) handle_pacman "$2";;
+	setup) handle_keys setup && handle_unified_kernel setup && \
+		handle_grub setup && handle_pacman setup;;
 	*) >&2 echo "$USAGE_MSG"
 esac

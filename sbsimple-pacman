@@ -1,0 +1,74 @@
+#!/bin/sh
+
+PACMAN_KERNEL_HOOK_CONTENTS="#!/bin/sh
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/initcpio/*
+
+[Action]
+Description = Updating Secure Boot unified kernels...
+When = PostTransaction
+Exec = $(realpath $0) pacman kernel-update
+NeedsTargets
+"
+PACMAN_GRUB_HOOK_CONTENTS="#!/bin/sh
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/grub/*
+
+[Action]
+Description = Updating Secure Boot unified kernels...
+When = PostTransaction
+Exec = $(realpath $0) pacman grub-update
+NeedsTargets
+"
+
+pacman_add_kernel_hook() {
+	report_stage "Adding Pacman hook for updating unified kernel"
+	report_start "Adding hook"
+	echo "$PACMAN_KERNEL_HOOK_CONTENTS" > /usr/share/libalpm/hooks/95-sbsimple-unified-kernel.hook
+	report_success
+}
+
+pacman_add_grub_hook() {
+	report_stage "Adding Pacman hook for updating GRUB image"
+	report_start "Adding hook"
+	echo "$PACMAN_GRUB_HOOK_CONTENTS" > /usr/share/libalpm/hooks/96-sbsimple-grub.hook
+	report_success
+}
+
+gtk_pw_prompt() {
+	echo "Prompting secure boot key password via GTK dialog..."
+	while [ -z "$PASS" ]; do
+		ce "zenity --password --title=\"Secure boot key decryption password\""
+		PASS="$CMDOUT"
+	done
+}
+
+PACMAN_USAGE_MSG="$BANNER
+
+USAGE: $0 pacman <subcommand> [-v]
+
+SUBCOMMANDS:
+	kernel-hook - Install unified kernel update hook
+	grub-hook - Install GRUB update hook
+	setup - Perform all of the above
+	kernel-update - To be called by the pacman update hook; creates new unified kernel images
+	grub-update - To be called by the pacman update hook; creates new grub image
+"
+
+handle_pacman() {
+	case "$1" in
+		kernel-hook) pacman_add_kernel_hook;;
+		grub-hook) pacman_add_grub_hook;;
+		setup) pacman_add_kernel_hook && pacman_add_grub_hook;;
+		kernel-update) gtk_pw_prompt && kernels_build && kernels_sign;;
+		grub-update) gtk_pw_prompt && grub_install && grub_sign;;
+		*) >&2 echo "$PACMAN_USAGE_MSG"
+	esac	
+}
