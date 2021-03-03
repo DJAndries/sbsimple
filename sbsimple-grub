@@ -5,7 +5,7 @@ DRIVE_UUID=$(echo "$LSBLK_OUT" | grep /boot | cut -d' ' -f1)
 DRIVE_PATH=$(echo "$LSBLK_OUT" | grep /boot | cut -d' ' -f3)
 ROOT_UUID=$(echo "$LSBLK_OUT" | grep " / " | cut -d' ' -f1)
 
-source /etc/default/grub
+. /etc/default/grub
 
 SECBOOT_ENTRY_CONTENTS="#!/bin/sh
 exec tail -n +3 \\\$0
@@ -34,10 +34,12 @@ password_pbkdf2 root $1"
 }
 
 grub_prompt_new_password() {
-	echo -n "Enter secure password to protect GRUB: "
-	read -s GRUBPASS
-	echo -ne "\nConfirm password: "
-	read -s CGRUBPASS
+	printf "Enter secure password to protect GRUB: "
+	stty -echo
+	read GRUBPASS
+	printf "\nConfirm password: "
+	read CGRUBPASS
+	stty echo
 	echo
 	[ -n "$GRUBPASS" ] && [ "$GRUBPASS" = "$CGRUBPASS" ] || grub_prompt_new_password
 }
@@ -56,8 +58,10 @@ grub_password() {
 	grub_prompt_new_password
 	report_stage "Adding password protection to GRUB"
 	report_start "Hashing password"
-	PASSHASH_INPUT=$(echo -e "$GRUBPASS\n$GRUBPASS\n")
-	ce "grub-mkpasswd-pbkdf2 <<< \"$PASSHASH_INPUT\""
+	PASSHASH_INPUT=$(printf "$GRUBPASS\n$GRUBPASS\n")
+	ce "grub-mkpasswd-pbkdf2 <<EOF
+$PASSHASH_INPUT
+EOF"
 	PASSHASH=$(echo "$CMDOUT" | grep PBKDF2 | cut -d' ' -f7)
 	report_start "Adding password protection config to /etc/grub.d"
 	ce "echo \"$(grub_gen_pwd_config "$PASSHASH")\" > /etc/grub.d/50_pwd"
@@ -68,8 +72,8 @@ grub_password() {
 }
 
 efi_remove_grub_entry() {
-	ce "efibootmgr | grep GRUB | head -n 1 | cut -d'*' -f1"
-	[ -n "$CMDOUT" ] && ce "efibootmgr -B -b ${CMDOUT:4:100}"
+	ce "efibootmgr | grep GRUB | head -n 1 | cut -d'*' -f1 | cut -c5-"
+	[ -n "$CMDOUT" ] && ce "efibootmgr -B -b $CMDOUT"
 }
 
 grub_install() {
@@ -93,7 +97,9 @@ grub_sign() {
 	prompt_existing_passphrase
 	cd /etc/efi-keys
 	report_start "Temporarily decrypting db key"
-	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< \"$PASS\""
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<EOF
+$PASS
+EOF"
 	report_start "Signing image"
 	ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/GRUB/grubx64.efi \
 /boot/EFI/GRUB/grubx64.efi"
@@ -114,7 +120,7 @@ grub_remove() {
 
 GRUB_USAGE_MSG="$BANNER
 
-USAGE: $0 grub <subcommand> [-v]
+USAGE: $(basename $0) grub <subcommand> [-v]
 
 SUBCOMMANDS:
 	unified-entry - Add unified kernel boot entry if not existing

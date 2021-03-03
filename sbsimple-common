@@ -1,41 +1,41 @@
 #!/bin/sh
 
-BANNER="sbsimple 0.1.0"
+BANNER="sbsimple"
 
 # SECTION: Util
 
 report_stage() {
-	echo -e "\n[\x1b[36mSTAGE\x1b[0m] $1"
+	printf "\n[\x1b[36mSTAGE\x1b[0m] $1\n"
 }
 
 report_success() {
-	[ -n "$LAST_REPORT" ] && echo -e "\r[\x1b[32mDONE\x1b[0m] $LAST_REPORT"
+	[ -n "$LAST_REPORT" ] && printf "\r[\x1b[32mDONE\x1b[0m] $LAST_REPORT\n"
 	unset LAST_REPORT
 }
 
 report_start() {
 	report_success
 	LAST_REPORT="$1"
-	echo -ne "[\x1b[33mWAIT\x1b[0m] $1"
+	printf "[\x1b[33mWAIT\x1b[0m] $1"
 }
 
 clean_tmp_keys() {
-	for i in "${KEY_NAMES[@]}"; do
+	for i in $KEY_NAMES; do
 		rm "/tmp/$i.key" 2>/dev/null
 	done
 }
 
 report_fail() {
 	clean_tmp_keys
-	[ -n "$LAST_REPORT" ] && echo -e "\r[\x1b[31mFAIL\x1b[0m] $LAST_REPORT"
-	echo -e "\nLast command: $CMD"
-	echo -e "Last command stderr: $CMDOUT"
+	[ -n "$LAST_REPORT" ] && printf "\r[\x1b[31mFAIL\x1b[0m] $LAST_REPORT\n"
+	printf "\nLast command: $(printf "$CMD" | head -n 1)\n"
+	printf "Last command stderr: $CMDOUT\n"
 	exit 1
 }
 
 ce() {
 	CMD="$1"
-	[ -n "$VERBOSE" ] && echo -e "\n[ce] Running: $CMD"
+	[ -n "$VERBOSE" ] && (printf "\n[ce] Running: $CMD\n" | head -n 2)
 	CMDOUT=$(sh -c "$1" 2>&1)
 	[ "$?" != "0" ] && report_fail
 }
@@ -50,7 +50,9 @@ confirm() {
 prompt_existing_passphrase() {
 	[ -n "$PASS" ] && return 0
 	echo -n "Enter passphrase to decrypt keys: "
-	read -s PASS
+	stty -echo
+	read PASS
+	stty echo
 	echo
 	[ -n "$PASS" ] || prompt_existing_passphrase
 }

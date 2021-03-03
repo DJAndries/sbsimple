@@ -1,15 +1,17 @@
 #!/bin/sh
 
 prompt_new_passphrase() {
-	echo -n "Enter secure passphrase to encrypt new keys: "
-	read -s PASS
-	echo -ne "\nConfirm passphrase: "
-	read -s CPASS
+	printf "Enter secure passphrase to encrypt new keys: "
+	stty -echo
+	read PASS
+	printf "\nConfirm passphrase: "
+	read CPASS
+	stty echo
 	echo
 	[ -n "$PASS" ] && [ "$PASS" = "$CPASS" ] || prompt_new_passphrase
 }
 
-KEY_NAMES=('PK' 'KEK' 'db')
+KEY_NAMES='PK KEK db'
 
 keys_generate() {
 
@@ -24,10 +26,12 @@ keys_generate() {
 
 	report_stage "Generating keys"
 
-	for i in "${KEY_NAMES[@]}"; do
+	for i in $KEY_NAMES; do
 		report_start "Generating secure boot $i key"
 		ce "openssl req -new -x509 -newkey rsa:4096 -subj \"/CN=sbsimple $i/\" -keyout $i.key \
--out $i.crt -days 3650 -sha256 -passout stdin <<< \"$PASS\""
+-out $i.crt -days 3650 -sha256 -passout stdin <<EOF
+$PASS
+EOF"
 		report_start "Creating DER certificate for $i key"
 		ce "openssl x509 -in $i.crt -out $i.cer -outform DER"
 		report_success
@@ -41,12 +45,14 @@ keys_efilists() {
 
 	ce "cat /proc/sys/kernel/random/uuid"
 	GUID="$CMDOUT"
-	SIGNING_PAIR="${KEY_NAMES[0]}"
-	for i in "${KEY_NAMES[@]}"; do
+	SIGNING_PAIR="PK"
+	for i in $KEY_NAMES; do
 		report_start "Creating EFI sig list for $i certificate"
 		ce "cert-to-efi-sig-list -g $GUID $i.crt $i.esl"
 		report_start "Temporarily decrypting $i key"
-		ce "openssl rsa -in $i.key -passin stdin -out /tmp/$i.key <<< \"$PASS\""
+		ce "openssl rsa -in $i.key -passin stdin -out /tmp/$i.key <<EOF
+$PASS
+EOF"
 		report_start "Signing EFI sig list for $i certificate"
 		ce "sign-efi-sig-list -t \"$(date --date='1 second' +'%Y-%m-%d %H:%M:%S')\" \
 -k /tmp/$SIGNING_PAIR.key -c $SIGNING_PAIR.crt $i $i.esl $i.auth"
@@ -62,7 +68,7 @@ keys_enroll() {
 	rm -rf /etc/secureboot/keys
 	mkdir -p /etc/secureboot/keys
 	chmod 600 /etc/secureboot/keys
-	for i in "${KEY_NAMES[@]}"; do
+	for i in $KEY_NAMES; do
 		report_start "Copying $i auth file to SB directory"
 		ce "mkdir /etc/secureboot/keys/$i && chmod 600 /etc/secureboot/keys/$i"
 		ce "cp /etc/efi-keys/$i.auth /etc/secureboot/keys/$i/$i.auth"
@@ -84,7 +90,7 @@ keys_remove() {
 
 KEYS_USAGE_MSG="$BANNER
 
-USAGE: $0 keys <subcommand> [-v]
+USAGE: $(basename $0) keys <subcommand> [-v]
 
 SUBCOMMANDS:
 	generate - Generate keys and certificates for secure boot

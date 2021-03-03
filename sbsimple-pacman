@@ -59,7 +59,7 @@ pacman_remove() {
 
 PACMAN_USAGE_MSG="$BANNER
 
-USAGE: $0 pacman <subcommand> [-v]
+USAGE: $(basename $0) pacman <subcommand> [-v]
 
 SUBCOMMANDS:
 	kernel-hook - Install unified kernel update hook

@@ -1,13 +1,13 @@
 #!/bin/sh
 
-UKERNELS=('linux' 'linux-fallback')
+UKERNELS="linux linux-fallback"
 
 kernels_build() {
 	report_stage "Building unified kernels"
 
 	UCODE_IMG=$(ls /boot | grep ucode.img | head -n 1)
 	
-	for i in "${UKERNELS[@]}"; do
+	for i in $UKERNELS; do
 		INITRAMFS="/boot/initramfs-$i.img"
 		if [ -n "$UCODE_IMG" ]; then
 			report_start "Creating new $i with ucode: $UCODE_IMG"
@@ -34,8 +34,10 @@ kernels_sign() {
 	prompt_existing_passphrase
 	report_start "Temporarily decrypting db key"
 	cd /etc/efi-keys
-	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<< \"$PASS\""
-	for i in "${UKERNELS[@]}"; do
+	ce "openssl rsa -in db.key -passin stdin -out /tmp/db.key <<EOF
+$PASS
+EOF"
+	for i in $UKERNELS; do
 		report_start "Signing $i unified kernel"
 		ce "sbsign --key /tmp/db.key --cert db.crt --output /boot/EFI/Linux/$i.efi /boot/EFI/Linux/$i.efi"
 		report_success
@@ -45,7 +47,7 @@ kernels_sign() {
 
 kernels_remove() {
 	report_start "Removing unified kernels"
-	for i in "${UKERNELS[@]}"; do
+	for i in $UKERNELS; do
 		rm /boot/EFI/Linux/$i.efi 2>/dev/null
 	done
 	report_success
@@ -53,7 +55,7 @@ kernels_remove() {
 
 KERN_USAGE_MSG="$BANNER
 
-USAGE: $0 unified-kernel <subcommand> [-v]
+USAGE: $(basename $0) unified-kernel <subcommand> [-v]
 
 SUBCOMMANDS:
 	build - Build unified kernels including initramfs and ucode
