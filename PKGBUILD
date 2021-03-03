@@ -21,7 +21,7 @@ install=
 changelog=
 noextract=()
 
-source=($(ls | grep "^sbsimple-[a-z\-]*$"))
+source=($(ls | grep "^\(sbsimple[a-z\-]*\|LICENSE\)$"))
 sha256sums=()
 for i in "${!source[@]}"; do
 	sha256sums[i]="SKIP"
@@ -39,6 +39,9 @@ package() {
 	for FILE in sbsimple-*; do
 		cp "$FILE" "$pkgdir/usr/share/sbsimple/$FILE"
 	done
+
+	mkdir -p "$pkgdir/usr/share/licenses/$pkgname"
+	cp ./LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
 	chmod -R 755 "$pkgdir/usr/share/sbsimple"
 }
