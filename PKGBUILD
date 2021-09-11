@@ -1,6 +1,6 @@
 # Maintainer: Darnell Andries <darnell@andries.ca>
 pkgname=sbsimple
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 epoch=
 pkgdesc="Utility for setting up UEFI secure boot in a simple way"
