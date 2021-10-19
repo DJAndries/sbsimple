@@ -14,14 +14,14 @@ menuentry 'Linux (Secure Boot)' --unrestricted {
 	insmod fat
 	insmod chain
 	search --no-floppy --fs-uuid --set=root $DRIVE_UUID 
-	chainloader /EFI/Linux/linux.efi root=UUID=$ROOT_UUID rw $GRUB_CMDLINE_LINUX_DEFAULT
+	chainloader /EFI/Linux/linux.efi root=UUID=$ROOT_UUID rw ${GRUB_CMDLINE_LINUX_DEFAULT}
 }
 
 menuentry 'Linux Fallback (Secure Boot)' --unrestricted {
 	insmod fat
 	insmod chain
 	search --no-floppy --fs-uuid --set=root $DRIVE_UUID
-	chainloader /EFI/Linux/linux-fallback.efi root=UUID=$ROOT_UUID rw $GRUB_CMDLINE_LINUX_DEFAULT
+	chainloader /EFI/Linux/linux-fallback.efi root=UUID=$ROOT_UUID rw ${GRUB_CMDLINE_LINUX_DEFAULT}
 }
 "
 
